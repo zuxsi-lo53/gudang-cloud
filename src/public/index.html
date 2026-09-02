@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Manajemen Gudang Cloud & Rekap Excel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- SheetJS untuk Export Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+  <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+    <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">📦 Sistem Manajemen Gudang Cloud</h1>
+        <p class="text-xs text-gray-500">Sinkronisasi Real-Time & Rekap Laporan Excel</p>
+      </div>
+      <div class="flex gap-2 mt-3 md:mt-0">
+        <button onclick="tabAktif('gudang')" id="btnGudang" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold">Data Gudang</button>
+        <button onclick="tabAktif('rekap')" id="btnRekap" class="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm font-semibold">Rekap & Export Excel</button>
+      </div>
+    </header>
+
+    <!-- KONTEN TAB GUDANG -->
+    <div id="sectionGudang" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-gray-50 p-4 rounded-lg border">
+          <h2 class="font-semibold text-lg mb-3 text-gray-700">Input / Scan Barang</h2>
+          <form id="barangForm" class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-600">SKU / Barcode</label>
+              <div class="flex gap-2">
+                <input type="text" id="sku" required class="w-full border rounded px-3 py-2 text-sm focus:ring focus:ring-blue-300">
+                <button type="button" onclick="startScanner()" class="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">Scan</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-600">Nama Barang</label>
+              <input type="text" id="nama" required class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-sm font-medium text-gray-600">Jumlah Stok</label>
+                <input type="number" id="jumlah" required class="w-full border rounded px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-600">Kategori</label>
+                <input type="text" id="kategori" class="w-full border rounded px-3 py-2 text-sm">
+              </div>
+            </div>
+            <button type="submit" class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700">Simpan / Sinkronkan</button>
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-lg border flex flex-col items-center justify-center">
+          <div id="reader" class="w-full max-w-xs"></div>
+          <button id="stopScannerBtn" onclick="stopScanner()" class="hidden mt-2 bg-red-500 text-white px-3 py-1 rounded text-xs">Tutup Kamera</button>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="font-semibold text-lg mb-3 text-gray-700">Stok Barang di Gudang</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-gray-200 text-gray-700 text-sm">
+                <th class="p-3">SKU</th>
+                <th class="p-3">Nama Barang</th>
+                <th class="p-3">Kategori</th>
+                <th class="p-3">Jumlah</th>
+                <th class="p-3">Update Terakhir</th>
+                <th class="p-3">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tabelBarang" class="divide-y divide-gray-200 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- KONTEN TAB REKAP & EXCEL -->
+    <div id="sectionRekap" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+        <div class="flex items-center gap-3 w-full md:w-auto">
+          <label class="text-sm font-medium text-gray-700">Filter Periode:</label>
+          <select id="filterPeriode" onchange="loadRekap()" class="border rounded px-3 py-2 text-sm bg-white">
+            <option value="mingguan">Mingguan (7 Hari Terakhir)</option>
+            <option value="bulanan">Bulanan (30 Hari Terakhir)</option>
+            <option value="semua">Semua Riwayat</option>
+          </select>
+        </div>
+        <button onclick="exportExcel()" class="w-full md:w-auto bg-emerald-600 text-white px-5 py-2 rounded text-sm font-semibold hover:bg-emerald-700 flex items-center justify-center gap-2">
+          📥 Unduh Rekapan Excel (.xlsx)
+        </button>
+      </div>
+
+      <div>
+        <h2 class="font-semibold text-lg mb-3 text-gray-700">Riwayat Transaksi & Mutasi Barang</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-gray-200 text-gray-700 text-sm">
+                <th class="p-3">Waktu</th>
+                <th class="p-3">SKU</th>
+                <th class="p-3">Nama Barang</th>
+                <th class="p-3">Tipe Mutasi</th>
+                <th class="p-3">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody id="tabelRekap" class="divide-y divide-gray-200 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = '/api/barang';
+    const API_REKAP = '/api/rekap';
+    let html5QrCode;
+    let dataRekapGlobal = [];
+
+    function tabAktif(tab) {
+      if (tab === 'gudang') {
+        document.getElementById('sectionGudang').classList.remove('hidden');
+        document.getElementById('sectionRekap').classList.add('hidden');
+        document.getElementById('btnGudang').className = "px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold";
+        document.getElementById('btnRekap').className = "px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm font-semibold";
+        loadData();
+      } else {
+        document.getElementById('sectionGudang').classList.add('hidden');
+        document.getElementById('sectionRekap').classList.remove('hidden');
+        document.getElementById('btnRekap').className = "px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold";
+        document.getElementById('btnGudang').className = "px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm font-semibold";
+        loadRekap();
+      }
+    }
+
+    async function loadData() {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+      const tbody = document.getElementById('tabelBarang');
+      tbody.innerHTML = '';
+      data.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td class="p-3 font-mono">${item.sku}</td>
+            <td class="p-3 font-medium">${item.nama}</td>
+            <td class="p-3">${item.kategori || '-'}</td>
+            <td class="p-3 font-bold text-blue-600">${item.jumlah}</td>
+            <td class="p-3 text-xs text-gray-500">${new Date(item.updated_at).toLocaleString()}</td>
+            <td class="p-3">
+              <button onclick="hapusBarang('${item.id}')" class="text-red-500 hover:underline text-xs">Hapus</button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    async function loadRekap() {
+      const periode = document.getElementById('filterPeriode').value;
+      const res = await fetch(`${API_REKAP}?periode=${periode}`);
+      dataRekapGlobal = await res.json();
+      const tbody = document.getElementById('tabelRekap');
+      tbody.innerHTML = '';
+      dataRekapGlobal.forEach(item => {
+        let badgeColor = 'bg-blue-100 text-blue-800';
+        if(item.tipe === 'BARU') badgeColor = 'bg-green-100 text-green-800';
+        if(item.tipe === 'KELUAR') badgeColor = 'bg-red-100 text-red-800';
+
+        tbody.innerHTML += `
+          <tr>
+            <td class="p-3 text-xs text-gray-500">${new Date(item.tanggal).toLocaleString()}</td>
+            <td class="p-3 font-mono">${item.sku}</td>
+            <td class="p-3 font-medium">${item.nama_barang}</td>
+            <td class="p-3"><span class="px-2 py-1 rounded text-xs font-semibold ${badgeColor}">${item.tipe}</span></td>
+            <td class="p-3 font-bold">${item.jumlah}</td>
+          </tr>
+        `;
+      });
+    }
+
+    document.getElementById('barangForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = {
+        sku: document.getElementById('sku').value,
+        nama: document.getElementById('nama').value,
+        jumlah: parseInt(document.getElementById('jumlah').value),
+        kategori: document.getElementById('kategori').value
+      };
+
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      document.getElementById('barangForm').reset();
+      loadData();
+    });
+
+    async function hapusBarang(id) {
+      if (confirm('Yakin ingin menghapus barang ini?')) {
+        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        loadData();
+      }
+    }
+
+    function exportExcel() {
+      if (dataRekapGlobal.length === 0) {
+        alert('Tidak ada data rekap untuk diunduh.');
+        return;
+      }
+      const formattedData = dataRekapGlobal.map(item => ({
+        "Waktu Transaksi": new Date(item.tanggal).toLocaleString(),
+        "SKU / Barcode": item.sku,
+        "Nama Barang": item.nama_barang,
+        "Tipe Mutasi": item.tipe,
+        "Jumlah": item.jumlah
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(formattedData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Gudang");
+      
+      const periode = document.getElementById('filterPeriode').value;
+      XLSX.writeFile(workbook, `Rekap_Gudang_${periode}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    function startScanner() {
+      document.getElementById('stopScannerBtn').classList.remove('hidden');
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        (decodedText) => {
+          document.getElementById('sku').value = decodedTest;
+          stopScanner();
+        },
+        (error) => {}
+      ).catch(err => alert("Kamera tidak dapat diakses: " + err));
+    }
+
+    function stopScanner() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          document.getElementById('stopScannerBtn').classList.add('hidden');
+        }).catch(err => console.log(err));
+      }
+    }
+
+    setInterval(() => {
+      if(!document.getElementById('sectionGudang').classList.contains('hidden')) {
+        loadData();
+      }
+    }, 3000);
+    loadData();
+  </script>
+</body>
+</html>
