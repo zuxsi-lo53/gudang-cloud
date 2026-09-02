@@ -8,4 +8,9 @@ ENVIRONMENT = "production"
 [[d1_databases]]
 binding = "DB"
 database_name = "gudang_db"
-database_id = "YOUR_D1_DATABASE_ID"
+database_id = "09a101ed-428e-4ac9-abd6-058d67fa45c4
+0
+0
+8.19 kB
+Sep 2 2026, 2:31PM
+"
